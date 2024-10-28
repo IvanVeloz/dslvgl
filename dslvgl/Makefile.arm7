@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: CC0-1.0
 #
 # SPDX-FileContributor: Antonio Niño Díaz, 2023
+# SPDX-FileContributor: Ivan Veloz, 2024
 
 export BLOCKSDS			?= /opt/blocksds/core
 export BLOCKSDSEXT		?= /opt/blocksds/external
@@ -17,7 +18,7 @@ INCLUDEDIRS	:= include source/common lvgl/src
 # Defines passed to all files
 # ---------------------------
 
-DEFINES		:=
+DEFINES		:= -DLV_CONF_PATH=lv_conf7.h
 
 # Libraries
 # ---------
