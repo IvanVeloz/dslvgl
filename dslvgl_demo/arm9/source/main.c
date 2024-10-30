@@ -50,9 +50,6 @@ inline void swap_rgb565_bgr555(uint16_t * src, uint16_t * dst) {
 
 void lvgl_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_map) {
     static bool firstrun = true;
-    int32_t x, y;
-    const int32_t hres = lv_display_get_horizontal_resolution(display);
-    uint16_t * srcbuf = (uint16_t *)px_map;
     static uint16_t * wrkbuf;
     static uint16_t * actbuf;
 
@@ -63,10 +60,15 @@ void lvgl_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_
          firstrun = false;
     }
 
-    while(dmaBusy(0)) {printf("dma");}
-    for(uint16_t *b = wrkbuf+hres*area->y1; b <= wrkbuf+area->y2*hres; b+=hres) {
-        for(x = area->x1; x <= area->x2; x++) {
-            swap_rgb565_bgr555(srcbuf, b+x);
+    while(dmaBusy(0)) {LV_LOG_TRACE("dma");}  // just in case DMA isn't done yet
+
+    const int32_t hres   = lv_display_get_horizontal_resolution(display);
+    uint16_t     *srcbuf = (uint16_t *)px_map;
+    // for every line in the area
+    for(uint16_t *l = wrkbuf+hres*area->y1; l <= wrkbuf+area->y2*hres; l+=hres) {
+        // for every pixel in the line
+        for(int32_t p = area->x1; p <= area->x2; p++) {
+            swap_rgb565_bgr555(srcbuf, l+p);
             srcbuf++;
         }
     }
@@ -78,7 +80,6 @@ void lvgl_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_
         actbuf = bgGetGfxPtr(bg);
         dmaCopyHalfWords(3, actbuf, wrkbuf, dispsize*sizeof(uint16_t));
     }
-
 
     lv_display_flush_ready(display);
 }
