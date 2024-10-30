@@ -20,7 +20,7 @@ BINDIRS		:=
 # Defines passed to all files
 # ---------------------------
 
-DEFINES		:= -DLV_CONF_PATH=lv_conf9.h
+DEFINES		:= LV_CONF_PATH=lv_conf9.h
 
 # Libraries
 # ---------

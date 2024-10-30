@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "*.arm7": "makefile",
+        "*.arm9": "makefile",
+        "nds.h": "c",
+        "lvgl.h": "c",
+        "neon.h": "c",
+        "lv_example_get_started.h": "c"
+    }
+}
