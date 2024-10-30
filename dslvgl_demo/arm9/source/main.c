@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: CC0-1.0
 //
 // SPDX-FileContributor: Antonio Niño Díaz, 2023
+// SPDX-FileContributor: Ivan Veloz, 2024
 
 #ifndef ARM9
 #define ARM9
@@ -36,6 +37,13 @@ void lvgl_tick_isr () {
     lv_tick_inc(1);
 }
 
+static void swap_framebuffer(int bg) {
+    if (bgGetMapBase(bg) == 8)
+        bgSetMapBase(bg, 0);
+    else
+        bgSetMapBase(bg, 8);
+}
+
 inline void swap_rgb565_bgr555(uint16_t * src, uint16_t * dst) {
     *dst = ((*src&0xF800)>>11) | ((*src&0x07C0)>>1) | ((*src&0x001F)<<10) | 0x8000;
 }
@@ -45,7 +53,15 @@ void lvgl_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_
     int32_t x, y;
     const int32_t hres = lv_display_get_horizontal_resolution(display);
     uint16_t * srcbuf = (uint16_t *)px_map;
-    uint16_t * wrkbuf = bgGetGfxPtr(bg);
+    static uint16_t * wrkbuf;
+    static uint16_t * actbuf;
+
+    if(firstrun) {
+         wrkbuf = bgGetGfxPtr(bg);
+         swap_framebuffer(bg);
+         actbuf = bgGetGfxPtr(bg);
+         firstrun = false;
+    }
 
     while(dmaBusy(0)) {printf("dma");}
     for(uint16_t *b = wrkbuf+hres*area->y1; b <= wrkbuf+area->y2*hres; b+=hres) {
@@ -57,12 +73,10 @@ void lvgl_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_
 
     if(lv_display_flush_is_last(display)) {
         swiWaitForVBlank();
-        if (bgGetMapBase(bg) == 8)
-            bgSetMapBase(bg, 0);
-        else
-            bgSetMapBase(bg, 8);
-        
-        dmaCopyHalfWords(0,wrkbuf, bgGetGfxPtr(bg),dispsize*sizeof(uint16_t));
+        wrkbuf = bgGetGfxPtr(bg);
+        swap_framebuffer(bg);
+        actbuf = bgGetGfxPtr(bg);
+        dmaCopyHalfWords(3, actbuf, wrkbuf, dispsize*sizeof(uint16_t));
     }
 
 
@@ -104,7 +118,6 @@ int main(int argc, char **argv)
 
     const size_t bufsize = dispsize*sizeof(uint16_t)>>3;
     uint16_t * buf1 = malloc(bufsize);
-    uint16_t * buf2 = malloc(bufsize);
 
     // Setup sub screen for the text console
     consoleDemoInit();
