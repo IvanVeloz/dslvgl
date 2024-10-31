@@ -73,7 +73,7 @@ void lvgl_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_
          firstrun = false;
     }
 
-    while(dmaBusy(0)) {LV_LOG_TRACE("dma");}  // just in case DMA isn't done yet
+    while(dmaBusy(3)) {LV_LOG_TRACE("dma");}  // just in case DMA isn't done yet
 
     const int32_t hres   = lv_display_get_horizontal_resolution(display);
     uint16_t     *srcbuf = (uint16_t *)px_map;
