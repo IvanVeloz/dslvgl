@@ -17,7 +17,7 @@ LVGL_DIR ?= ${shell pwd}  #The path where the lvgl folder is
 # Source code paths
 # -----------------
 
-SOURCEDIRS	:= arm9/source common/source lvgl/src
+SOURCEDIRS	:= arm9/source common/source lvgl/src lvgl/demos
 INCLUDEDIRS	:= common/include lvgl
 GFXDIRS		:= arm9/graphics
 BINDIRS		:= arm9/data
