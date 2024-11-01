@@ -1,6 +1,6 @@
 [submodule "dslvgl/meta/lvgl"]
-	path = dslvgl/lvgl
+	path = dslvgl/source/common/lvgl
 	url = https://github.com/lvgl/lvgl.git
 [submodule "dslvgl_demo/lvgl"]
-	path = dslvgl_demo/lvgl
+	path = dslvgl_demo/common/source/lvgl
 	url = https://github.com/lvgl/lvgl.git
