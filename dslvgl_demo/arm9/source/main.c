@@ -31,12 +31,43 @@
 #include "examples/get_started/lv_example_get_started.h"
 #include "demos/lv_demos.h"
 
+#define DMA_CH_MAIN 3
+#define DMA_CH_SUB  2
+
 const size_t dispsize = 256*192;
+const size_t fbsize = dispsize*sizeof(uint16_t);
 int bg;
+
+typedef struct {
+    uint16_t * buffer;  // back framebuffer raw pointer
+    int bgid;           // front framebuffer's background ID (returned from bgInit or bgInitSub)
+    comutex_t mutex;    // mutex to lock the structure's data
+} dslvgl_framebuffer_t;
+
+dslvgl_framebuffer_t fbmain;
+dslvgl_framebuffer_t fbsub;
 
 void lvgl_tick_isr () {
     lv_tick_inc(1);
 }
+
+void lvgl_vblank_isr() {
+    if(comutex_try_acquire(&fbmain.mutex)) {
+        assert(dmaBusy(DMA_CH_MAIN) == false);
+        dmaCopyHalfWords(DMA_CH_MAIN, fbmain.buffer, bgGetGfxPtr(fbmain.bgid), fbsize);
+        comutex_release(&fbmain.mutex);
+    } /*
+    if(comutex_try_acquire(&fbsub.mutex)) {
+        assert(dmaBusy(DMA_CH_SUB) == false);
+        dmaCopyHalfWords(DMA_CH_SUB, fbsub.buffer, bgGetGfxPtr(fbsub.bgid), fbsize);
+        comutex_release(&fbsub.mutex);
+    }*/
+    // If a mutex can't be acquired, it's because the back buffer is being 
+    // written to. In that case we skip rendering a frame.
+    // The lowest DMA channel number gets priority until the transfer 
+    // is complete.
+}
+
 
 void lvgl_touch_cb(lv_indev_t * indev, lv_indev_data_t * data) {
     if(keysCurrent()&KEY_TOUCH) {
@@ -62,18 +93,10 @@ inline void swap_rgb565_bgr555(uint16_t * src, uint16_t * dst) {
 }
 
 void lvgl_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_map) {
-    static bool firstrun = true;
-    static uint16_t * wrkbuf;
-    static uint16_t * actbuf;
 
-    if(firstrun) {
-         wrkbuf = bgGetGfxPtr(bg);
-         swap_framebuffer(bg);
-         actbuf = bgGetGfxPtr(bg);
-         firstrun = false;
-    }
-
-    while(dmaBusy(3)) {LV_LOG_TRACE("dma");}  // just in case DMA isn't done yet
+    while(dmaBusy(DMA_CH_MAIN)) {LV_LOG_TRACE("dma");}  // just in case DMA isn't done yet
+    comutex_acquire(&fbmain.mutex);
+    uint16_t * wrkbuf = fbmain.buffer;
 
     const int32_t hres   = lv_display_get_horizontal_resolution(display);
     uint16_t     *srcbuf = (uint16_t *)px_map;
@@ -86,14 +109,16 @@ void lvgl_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_
         }
     }
 
+    
     if(lv_display_flush_is_last(display)) {
-        swiWaitForVBlank();
-        wrkbuf = bgGetGfxPtr(bg);
-        swap_framebuffer(bg);
-        actbuf = bgGetGfxPtr(bg);
-        dmaCopyHalfWords(3, actbuf, wrkbuf, dispsize*sizeof(uint16_t));
-    }
+        // for dual displays, put both dmaCopy on the VBlank interrupt.
+        // finished
+        // needs a mutex
+        //swiWaitForVBlank();
+        //dmaCopyHalfWords(3, wrkbuf, bgGetGfxPtr(bg), dispsize*sizeof(uint16_t));
 
+    }
+    comutex_release(&fbmain.mutex);
     lv_display_flush_ready(display);
 }
 
@@ -158,13 +183,22 @@ int main(int argc, char **argv)
                         VRAM_C_LCD, VRAM_D_LCD);
 
 
-    bg = bgInit(2, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
+    fbmain.bgid = bgInit   (2, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
+    fbsub.bgid  = bgInitSub(2, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
 
-    const size_t bufsize = dispsize*sizeof(uint16_t)>>3;
-    uint16_t * buf1 = malloc(bufsize);
+    const size_t bufsize = fbsize; //dispsize*sizeof(uint16_t)>>3;
+    uint16_t * buf1 = malloc(fbsize);
 
+    assert(comutex_init(&fbmain.mutex));
+    assert(comutex_init(&fbsub.mutex));
+    fbmain.buffer = malloc(bufsize);
+    assert(fbmain.buffer!=NULL);
+    fbsub.buffer  = malloc(bufsize);
+    assert(fbsub.buffer!=NULL);
+    
     // Setup sub screen for the text console
     consoleDemoInit();
+    printf("ready\n");
 
     /* LVGL STUFF */
     // Initialize LVGL
@@ -188,6 +222,9 @@ int main(int argc, char **argv)
     //lv_demo_benchmark();
 
     /* END OF LVGL STUFF */
+
+    irqSet(IRQ_VBLANK, lvgl_vblank_isr);
+    irqEnable(IRQ_VBLANK);
 
     // Load demo keyboard
     Keyboard *kbd = keyboardDemoInit();
