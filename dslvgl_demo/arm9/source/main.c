@@ -53,10 +53,12 @@ void lvgl_tick_isr () {
 
 void lvgl_vblank_isr() {
     if(comutex_try_acquire(&fbmain.mutex)) {
+        assert(dmaBusy(DMA_CH_MAIN) == false);
         dmaCopyHalfWords(DMA_CH_MAIN, fbmain.buffer, bgGetGfxPtr(fbmain.bgid), fbsize);
         comutex_release(&fbmain.mutex);
     } /*
     if(comutex_try_acquire(&fbsub.mutex)) {
+        assert(dmaBusy(DMA_CH_SUB) == false);
         dmaCopyHalfWords(DMA_CH_SUB, fbsub.buffer, bgGetGfxPtr(fbsub.bgid), fbsize);
         comutex_release(&fbsub.mutex);
     }*/
@@ -91,10 +93,10 @@ inline void swap_rgb565_bgr555(uint16_t * src, uint16_t * dst) {
 }
 
 void lvgl_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_map) {
+
+    while(dmaBusy(DMA_CH_MAIN)) {LV_LOG_TRACE("dma");}  // just in case DMA isn't done yet
     comutex_acquire(&fbmain.mutex);
     uint16_t * wrkbuf = fbmain.buffer;
-
-    while(dmaBusy(DMA_CH_MAIN)) {printf("dma");}  // just in case DMA isn't done yet
 
     const int32_t hres   = lv_display_get_horizontal_resolution(display);
     uint16_t     *srcbuf = (uint16_t *)px_map;
