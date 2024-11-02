@@ -3,5 +3,5 @@
 	url = https://github.com/lvgl/lvgl.git
 
 [submodule "dslvgl_demo/arm9/source/lvgl"]
-	path = dslvgl_demo/arm9/source/lvgl
+	path = dslvgl_demo/arm9/include/lvgl
 	url = https://github.com/lvgl/lvgl.git
