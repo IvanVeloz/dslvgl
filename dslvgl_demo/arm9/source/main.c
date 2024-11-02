@@ -28,9 +28,9 @@
 
 #include "lvgl/lvgl.h"
 #include <time.h>
-#include "lvgl/examples/anim/lv_example_anim_2.c"
-#include "lvgl/examples/get_started/lv_example_get_started.h"
+#include "lvgl/examples/lv_examples.h"
 #include "lvgl/demos/lv_demos.h"
+#include "dslvgl.h"
 
 #define DMA_CH_MAIN 3
 #define DMA_CH_SUB  2
@@ -38,12 +38,6 @@
 const size_t dispsize = 256*192;
 const size_t fbsize = dispsize*sizeof(uint16_t);
 int bg;
-
-typedef struct {
-    uint16_t * buffer;  // back framebuffer raw pointer
-    int bgid;           // front framebuffer's background ID (returned from bgInit or bgInitSub)
-    comutex_t mutex;    // mutex to lock the structure's data
-} dslvgl_framebuffer_t;
 
 dslvgl_framebuffer_t fbmain;
 dslvgl_framebuffer_t fbsub;
@@ -123,48 +117,6 @@ void lvgl_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_
     lv_display_flush_ready(display);
 }
 
-void lv_example_get_started_1(void)
-{
-    /*Change the active screen's background color*/
-    lv_obj_set_style_bg_color(lv_screen_active(), lv_color_hex(0x003a57), LV_PART_MAIN);
-
-    /*Create a white label, set its text and align it to the center*/
-    lv_obj_t * label = lv_label_create(lv_screen_active());
-    lv_label_set_text(label, "Hello world");
-    lv_obj_set_style_text_color(lv_screen_active(), lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
-}
-
-
-static void btn_event_cb(lv_event_t * e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * btn = lv_event_get_target(e);
-    if(code == LV_EVENT_CLICKED) {
-        static uint8_t cnt = 0;
-        cnt++;
-
-        /*Get the first child of the button which is the label and change its text*/
-        lv_obj_t * label = lv_obj_get_child(btn, 0);
-        lv_label_set_text_fmt(label, "Button: %d", cnt);
-    }
-}
-
-/**
- * Create a button with a label and react on click event.
- */
-void lv_example_get_started_2(void)
-{
-    lv_obj_t * btn = lv_button_create(lv_screen_active());     /*Add a button the current screen*/
-    lv_obj_set_pos(btn, 10, 10);                            /*Set its position*/
-    lv_obj_set_size(btn, 120, 50);                          /*Set its size*/
-    lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_ALL, NULL);           /*Assign a callback to the button*/
-
-    lv_obj_t * label = lv_label_create(btn);          /*Add a label to the button*/
-    lv_label_set_text(label, "Button");                     /*Set the labels text*/
-    lv_obj_center(label);
-}
-
 // Callback called whenver the keyboard is pressed so that a character is
 // printed on the screen.
 void on_key_pressed(int key)
@@ -175,27 +127,10 @@ void on_key_pressed(int key)
 
 int main(int argc, char **argv)
 {
-
+    int r;
     lcdSwap();
-
-    videoSetMode(MODE_5_2D);
-
-    vramSetPrimaryBanks(VRAM_A_MAIN_BG_0x06000000, VRAM_B_MAIN_BG_0x06020000,
-                        VRAM_C_LCD, VRAM_D_LCD);
-
-
-    fbmain.bgid = bgInit   (2, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
-    fbsub.bgid  = bgInitSub(2, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
-
-    const size_t bufsize = fbsize; //dispsize*sizeof(uint16_t)>>3;
-    uint16_t * buf1 = malloc(fbsize);
-
-    assert(comutex_init(&fbmain.mutex));
-    assert(comutex_init(&fbsub.mutex));
-    fbmain.buffer = malloc(bufsize);
-    assert(fbmain.buffer!=NULL);
-    fbsub.buffer  = malloc(bufsize);
-    assert(fbsub.buffer!=NULL);
+    r = dslvgl_driver_init(DSLVGL_INIT_MAIN);
+    assert(r == 0);
     
     // Setup sub screen for the text console
     consoleDemoInit();
@@ -206,11 +141,16 @@ int main(int argc, char **argv)
     lv_init();
     
     // Setup tick timer, 1ms period
-    timerStart(0,ClockDivider_1,timerFreqToTicks_1(1000),lvgl_tick_isr);
+    timerStart(0,ClockDivider_1,timerFreqToTicks_1(1000),dslvgl_tick_isr);
 
     lv_display_t * displaymain = lv_display_create(256, 192);
-    lv_display_set_flush_cb(displaymain, lvgl_flush_cb);
-    lv_display_set_buffers(displaymain, buf1, NULL, bufsize, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(displaymain, dslvgl_main_flush_cb);
+    lv_display_set_buffers(
+        displaymain, 
+        dslvgl_driver_get_buf(DSLVGL_DISP_MAIN), 
+        NULL, 
+        dslvgl_driver_get_buf_size(DSLVGL_DISP_MAIN), 
+        dslvgl_driver_get_render_mode(DSLVGL_DISP_MAIN));
 
     // Register touchscreen as input device
     lv_indev_t * indev = lv_indev_create();
@@ -221,11 +161,12 @@ int main(int argc, char **argv)
     lv_example_anim_2();
     //lv_example_get_started_2();
     //lv_demo_benchmark();
+    irqSet(IRQ_VBLANK, dslvgl_vblank_isr);
+    irqEnable(IRQ_VBLANK);
+
 
     /* END OF LVGL STUFF */
 
-    irqSet(IRQ_VBLANK, lvgl_vblank_isr);
-    irqEnable(IRQ_VBLANK);
 
     // Load demo keyboard
     Keyboard *kbd = keyboardDemoInit();
@@ -316,8 +257,6 @@ int main(int argc, char **argv)
             break;
 
     }
-
-    free(buf1);
 
     return 0;
 }
