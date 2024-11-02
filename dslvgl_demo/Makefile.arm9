@@ -8,17 +8,11 @@ export BLOCKSDSEXT		?= /opt/blocksds/external
 export WONDERFUL_TOOLCHAIN	?= /opt/wonderful
 ARM_NONE_EABI_PATH	?= $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/
 
-# LVGL Makefile inclusion
-# -----------------------
-
-LVGL_DIR_NAME ?= lvgl     #The name of the lvgl folder (change this if you have renamed it)
-LVGL_DIR ?= ${shell pwd}  #The path where the lvgl folder is
-
 # Source code paths
 # -----------------
 
-SOURCEDIRS	:= arm9/source common/source lvgl/src lvgl/demos
-INCLUDEDIRS	:= common/include lvgl
+SOURCEDIRS	:= arm9/source common/source
+INCLUDEDIRS	:= common/include arm9/source
 GFXDIRS		:= arm9/graphics
 BINDIRS		:= arm9/data
 AUDIODIRS	:= arm9/audio
