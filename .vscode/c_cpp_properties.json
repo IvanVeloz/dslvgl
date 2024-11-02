@@ -8,7 +8,8 @@
             ],
             "defines": [],
             "compilerPath": "/usr/lib64/ccache/clang",
-            "intelliSenseMode": "linux-clang-x64"
+            "intelliSenseMode": "linux-gcc-arm",
+            "cStandard": "c17"
         }
     ],
     "version": 4

@@ -5,6 +5,8 @@
         "nds.h": "c",
         "lvgl.h": "c",
         "neon.h": "c",
-        "lv_example_get_started.h": "c"
+        "lv_example_get_started.h": "c",
+        "stdio.h": "c",
+        "time.h": "c"
     }
 }
